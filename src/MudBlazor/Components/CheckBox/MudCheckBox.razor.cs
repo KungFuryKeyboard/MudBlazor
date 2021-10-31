@@ -1,6 +1,9 @@
-﻿using System.Threading.Tasks;
+﻿using System;
+using System.Threading.Tasks;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Web;
 using MudBlazor.Extensions;
+using MudBlazor.Services;
 using MudBlazor.Utilities;
 
 namespace MudBlazor
@@ -10,14 +13,17 @@ namespace MudBlazor
         protected string Classname =>
         new CssBuilder("mud-checkbox")
             .AddClass($"mud-disabled", Disabled)
+            .AddClass($"mud-readonly", ReadOnly)
           .AddClass(Class)
         .Build();
 
         protected string CheckBoxClassname =>
         new CssBuilder("mud-button-root mud-icon-button")
-            .AddClass($"mud-checkbox-{Color.ToDescriptionString()}")
+            .AddClass($"mud-icon-button-color-{Color.ToDescriptionString()}")
+            .AddClass($"mud-checkbox-dense", Dense)
             .AddClass($"mud-ripple mud-ripple-checkbox", !DisableRipple)
             .AddClass($"mud-disabled", Disabled)
+            .AddClass($"mud-readonly", ReadOnly)
         .Build();
 
         /// <summary>
@@ -34,6 +40,16 @@ namespace MudBlazor
         /// If true, disables ripple effect.
         /// </summary>
         [Parameter] public bool DisableRipple { get; set; }
+
+        /// <summary>
+        /// If true, compact padding will be applied.
+        /// </summary>
+        [Parameter] public bool Dense { get; set; }
+
+        /// <summary>
+        /// The Size of the component.
+        /// </summary>
+        [Parameter] public Size Size { get; set; } = Size.Medium;
 
         /// <summary>
         /// Child content of component.
@@ -59,7 +75,7 @@ namespace MudBlazor
         public string IndeterminateIcon { get; set; } = Icons.Material.Filled.IndeterminateCheckBox;
 
         /// <summary>
-        /// Define if the checkbox can cycle again through inderterminate status.
+        /// Define if the checkbox can cycle again through indeterminate status.
         /// </summary>
         [Parameter] public bool TriState { get; set; }
 
@@ -99,6 +115,73 @@ namespace MudBlazor
             {
                 return SetBoolValueAsync((bool?)args.Value);
             }
+        }
+
+        protected void HandleKeyDown(KeyboardEventArgs obj)
+        {
+            if (Disabled || ReadOnly)
+                return;
+            switch (obj.Key)
+            {
+                case "Escape":
+                    SetBoolValueAsync(false);
+                    break;
+                case "Enter":
+                case "NumpadEnter":
+                    SetBoolValueAsync(true);
+                    break;
+                case "Backspace":
+                    if (TriState)
+                    {
+                        SetBoolValueAsync(null);
+                    }
+                    break;
+                case " ":
+                    if (BoolValue == null)
+                    {
+                        SetBoolValueAsync(true);
+                    }
+                    else if (BoolValue == true)
+                    {
+                        SetBoolValueAsync(false);
+                    }
+                    else if (BoolValue == false)
+                    {
+                        if (TriState == true)
+                        {
+                            SetBoolValueAsync(null);
+                        }
+                        else
+                        {
+                            SetBoolValueAsync(true);
+                        }
+                    }
+                    break;
+            }
+        }
+
+        [Inject] private IKeyInterceptor _keyInterceptor { get; set; }
+
+        private string _elementId = "checkbox" + Guid.NewGuid().ToString().Substring(0, 8);
+
+        protected override async Task OnAfterRenderAsync(bool firstRender)
+        {
+            if (firstRender)
+            {
+                await _keyInterceptor.Connect(_elementId, new KeyInterceptorOptions()
+                {
+                    //EnableLogging = true,
+                    TargetClass = "mud-button-root",
+                    Keys = {
+                        new KeyOptions { Key=" ", PreventDown = "key+none", PreventUp = "key+none" }, // prevent scrolling page
+                        new KeyOptions { Key="Enter", PreventDown = "key+none" },
+                        new KeyOptions { Key="NumpadEnter", PreventDown = "key+none" },
+                        new KeyOptions { Key="Escape", PreventDown = "key+none" },
+                        new KeyOptions { Key="Backspace", PreventDown = "key+none" },
+                    },
+                });
+            }
+            await base.OnAfterRenderAsync(firstRender);
         }
     }
 }

@@ -2,17 +2,13 @@
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
-using System.Threading.Tasks;
-using System.Windows.Input;
 using Microsoft.AspNetCore.Components;
-using Microsoft.AspNetCore.Components.Web;
 using MudBlazor.Extensions;
-using MudBlazor.Interfaces;
 using MudBlazor.Utilities;
 
 namespace MudBlazor
 {
-    public class MudChartBase : MudComponentBase
+    public abstract class MudChartBase : MudComponentBase
     {
         [Parameter] public double[] InputData { get; set; } = Array.Empty<double>();
 
@@ -20,15 +16,18 @@ namespace MudBlazor
 
         [Parameter] public string[] XAxisLabels { get; set; } = Array.Empty<string>();
 
-        [Parameter] public List<ChartSeries> ChartSeries { get; set; } = new List<ChartSeries>();
+        [Parameter] public List<ChartSeries> ChartSeries { get; set; } = new();
 
-        [Parameter] public ChartOptions ChartOptions { get; set; } = new ChartOptions();
+        [Parameter] public ChartOptions ChartOptions { get; set; } = new();
 
         protected string Classname =>
         new CssBuilder("mud-chart")
-           .AddClass($"mud-chart-legend-{LegendPosition.ToDescriptionString()}")
+           .AddClass($"mud-chart-legend-{ConvertLegendPosition(LegendPosition).ToDescriptionString()}")
           .AddClass(Class)
         .Build();
+
+        [CascadingParameter]
+        public bool RightToLeft { get; set; }
 
         /// <summary>
         /// The Type of the chart.
@@ -46,15 +45,25 @@ namespace MudBlazor
         [Parameter] public string Height { get; set; } = "80%";
 
         /// <summary>
-        /// The placment direction of the legend if used.
+        /// The placement direction of the legend if used.
         /// </summary>
         [Parameter] public Position LegendPosition { get; set; } = Position.Bottom;
+
+        private Position ConvertLegendPosition(Position position)
+        {
+            return position switch
+            {
+                Position.Start => RightToLeft ? Position.Right : Position.Left,
+                Position.End => RightToLeft ? Position.Left : Position.Right,
+                _ => position
+            };
+        }
 
         private int _selectedIndex;
 
         /// <summary>
         /// Selected index of a portion of the chart.
-        /// </summary>     
+        /// </summary>
         [Parameter]
         public int SelectedIndex
         {
@@ -71,7 +80,7 @@ namespace MudBlazor
 
         /// <summary>
         /// Selected index of a portion of the chart.
-        /// </summary>    
+        /// </summary>
         [Parameter] public EventCallback<int> SelectedIndexChanged { get; set; }
 
         /// <summary>
@@ -85,10 +94,14 @@ namespace MudBlazor
             return InputData.Select(x => Math.Abs(x) / total).ToArray();
         }
 
-        protected string ToS(double d)
+        protected string ToS(double d, string format = null)
         {
-            return d.ToString(CultureInfo.InvariantCulture);
+            if (string.IsNullOrEmpty(format))
+                return d.ToString(CultureInfo.InvariantCulture);
+
+            return d.ToString(format);
         }
+
     }
 
     public enum ChartType

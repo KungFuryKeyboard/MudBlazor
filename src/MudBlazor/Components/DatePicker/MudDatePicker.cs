@@ -3,7 +3,6 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Components;
 using MudBlazor.Extensions;
 using MudBlazor.Utilities;
-using static System.String;
 
 namespace MudBlazor
 {
@@ -26,10 +25,23 @@ namespace MudBlazor
             set => SetDateAsync(value, true).AndForget();
         }
 
+        /// <summary>
+        /// If AutoClose is set to true and PickerActions are defined, selecting a day will close the MudDatePicker.
+        /// </summary>
+        [Parameter] public bool AutoClose { get; set; }
+
         protected async Task SetDateAsync(DateTime? date, bool updateValue)
         {
             if (_value != date)
             {
+                Touched = true;
+
+                if (date is not null && IsDateDisabledFunc(date.Value.Date))
+                {
+                    await SetTextAsync(null, false);
+                    return;
+                }
+
                 _value = date;
                 if (updateValue)
                 {
@@ -62,14 +74,14 @@ namespace MudBlazor
             if ((Date?.Date == day && _selectedDate == null) || _selectedDate?.Date == day)
                 return b.AddClass("mud-selected").AddClass($"mud-theme-{Color.ToDescriptionString()}").Build();
             if (day == DateTime.Today)
-                return b.AddClass("mud-current").AddClass($"mud-{Color.ToDescriptionString()}-text").Build();
+                return b.AddClass("mud-current mud-button-outlined").AddClass($"mud-button-outlined-{Color.ToDescriptionString()} mud-{Color.ToDescriptionString()}-text").Build();
             return b.Build();
         }
 
         protected override async void OnDayClicked(DateTime dateTime)
         {
             _selectedDate = dateTime;
-            if (PickerActions == null)
+            if (PickerActions == null || AutoClose)
             {
                 Submit();
 
@@ -90,6 +102,8 @@ namespace MudBlazor
 
         protected override async void Submit()
         {
+            if (ReadOnly)
+                return;
             if (_selectedDate == null)
                 return;
 

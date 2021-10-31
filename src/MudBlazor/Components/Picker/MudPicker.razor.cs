@@ -1,7 +1,8 @@
-﻿using System.Threading.Tasks;
+﻿using System;
+using System.Diagnostics.CodeAnalysis;
+using System.Threading.Tasks;
 using Microsoft.AspNetCore.Components;
-using MudBlazor.Extensions;
-using MudBlazor.Interfaces;
+using Microsoft.AspNetCore.Components.Web;
 using MudBlazor.Services;
 using MudBlazor.Utilities;
 
@@ -9,24 +10,13 @@ namespace MudBlazor
 {
     public partial class MudPicker<T> : MudFormComponent<T, string>
     {
-        enum PickerVerticalPosition
-        {
-            Unknown,
-            Below,
-            Above,
-            Top,
-            Bottom
-        }
-
-        enum PickerHorizontalPosition
-        {
-            Unknown,
-            Left,
-            Right
-        }
 
         public MudPicker() : base(new Converter<T, string>()) { }
         protected MudPicker(Converter<T, string> converter) : base(converter) { }
+
+        [Inject] private IKeyInterceptor _keyInterceptor { get; set; }
+
+        private string _elementId = "picker" + Guid.NewGuid().ToString().Substring(0, 8);
 
         [Inject] private IBrowserWindowSizeProvider WindowSizeListener { get; set; }
 
@@ -43,7 +33,8 @@ namespace MudBlazor
             .Build();
 
         protected string PickerPaperClass =>
-            new CssBuilder("mud-picker-paper")
+            new CssBuilder("mud-picker")
+                .AddClass("mud-picker-paper")
                 .AddClass("mud-picker-view", PickerVariant == PickerVariant.Inline)
                 .AddClass("mud-picker-open", IsOpen && PickerVariant == PickerVariant.Inline)
                 .AddClass("mud-picker-popover-paper", PickerVariant == PickerVariant.Inline)
@@ -52,13 +43,6 @@ namespace MudBlazor
 
         protected string PickerInlineClass =>
             new CssBuilder("mud-picker-inline-paper")
-                .AddClass("mud-picker-hidden", _pickerVerticalPosition == PickerVerticalPosition.Unknown && PickerVariant == PickerVariant.Inline)
-                .AddClass("mud-picker-pos-top", _pickerVerticalPosition == PickerVerticalPosition.Top)
-                .AddClass("mud-picker-pos-above", _pickerVerticalPosition == PickerVerticalPosition.Above)
-                .AddClass("mud-picker-pos-bottom", _pickerVerticalPosition == PickerVerticalPosition.Bottom)
-                .AddClass("mud-picker-pos-below", _pickerVerticalPosition == PickerVerticalPosition.Below)
-                .AddClass("mud-picker-pos-left", _pickerHorizontalPosition == PickerHorizontalPosition.Left)
-                .AddClass("mud-picker-pos-right", _pickerHorizontalPosition == PickerHorizontalPosition.Right)
             .Build();
 
         protected string PickerContainerClass =>
@@ -78,7 +62,29 @@ namespace MudBlazor
         /// <summary>
         /// Sets the icon of the input text field
         /// </summary>
-        [Parameter] public string InputIcon { get; set; } = Icons.Filled.Event;
+        [ExcludeFromCodeCoverage]
+        [Parameter]
+        [Obsolete("Obsolete, use AdornmentIcon")]
+        public string InputIcon
+        {
+            get { return AdornmentIcon; }
+            set { AdornmentIcon = value; }
+        }
+
+        /// <summary>
+        /// The color of the adornment if used. It supports the theme colors.
+        /// </summary>
+        [Parameter] public Color AdornmentColor { get; set; } = Color.Default;
+
+        /// <summary>
+        /// Sets the icon of the input text field
+        /// </summary>
+        [Parameter] public string AdornmentIcon { get; set; } = Icons.Material.Filled.Event;
+
+        /// <summary>
+        /// The short hint displayed in the input before the user enters a value.
+        /// </summary>
+        [Parameter] public string Placeholder { get; set; }
 
         /// <summary>
         /// Fired when the dropdown / dialog opens
@@ -96,9 +102,14 @@ namespace MudBlazor
         [Parameter] public int Elevation { set; get; } = 8;
 
         /// <summary>
-        /// If true, border-radius is set to 0 this is set to true automaticly in static mode but can be overridden with Rounded bool.
+        /// If true, border-radius is set to 0 this is set to true automatically in static mode but can be overridden with Rounded bool.
         /// </summary>
         [Parameter] public bool Square { get; set; }
+
+        /// <summary>
+        /// If true, no date or time can be defined.
+        /// </summary>
+        [Parameter] public bool ReadOnly { get; set; }
 
         /// <summary>
         /// If true, border-radius is set to theme default when in Static Mode.
@@ -106,9 +117,14 @@ namespace MudBlazor
         [Parameter] public bool Rounded { get; set; }
 
         /// <summary>
-        /// If string has value, helpertext will be applied.
+        /// If string has value, HelperText will be applied.
         /// </summary>
         [Parameter] public string HelperText { get; set; }
+
+        /// <summary>
+        /// If true, the helper text will only be visible on focus.
+        /// </summary>
+        [Parameter] public bool HelperTextOnFocus { get; set; }
 
         /// <summary>
         /// If string has value the label text will be displayed in the input, and scaled down at the top if the input has value.
@@ -141,9 +157,21 @@ namespace MudBlazor
         [Parameter] public PickerVariant PickerVariant { get; set; } = PickerVariant.Inline;
 
         /// <summary>
+        ///  Variant of the text input
+        /// </summary>
+        [ExcludeFromCodeCoverage]
+        [Parameter]
+        [Obsolete("Obsolete, use Variant")]
+        public Variant InputVariant
+        {
+            get { return Variant; }
+            set { Variant = value; }
+        }
+
+        /// <summary>
         /// Variant of the text input
         /// </summary>
-        [Parameter] public Variant InputVariant { get; set; } = Variant.Text;
+        [Parameter] public Variant Variant { get; set; } = Variant.Text;
 
         /// <summary>
         /// Sets if the icon will be att start or end, set to false to disable.
@@ -261,12 +289,17 @@ namespace MudBlazor
             }
         }
 
+        private MudTextField<string> _inputReference;
+
+        public virtual ValueTask FocusAsync() => _inputReference?.FocusAsync() ?? ValueTask.CompletedTask;
+
+        public virtual ValueTask SelectAsync() => _inputReference?.SelectAsync() ?? ValueTask.CompletedTask;
+
+        public virtual ValueTask SelectRangeAsync(int pos1, int pos2) => _inputReference?.SelectRangeAsync(pos1, pos2) ?? ValueTask.CompletedTask;
+
         private bool _pickerSquare;
         private int _pickerElevation;
         private ElementReference _pickerInlineRef;
-
-        private PickerVerticalPosition _pickerVerticalPosition = PickerVerticalPosition.Unknown;
-        private PickerHorizontalPosition _pickerHorizontalPosition = PickerHorizontalPosition.Unknown;
 
         protected override void OnInitialized()
         {
@@ -293,7 +326,25 @@ namespace MudBlazor
             }
         }
 
-        protected void ToggleState()
+        protected override async Task OnAfterRenderAsync(bool firstRender)
+        {
+            if (firstRender)
+            {
+                await _keyInterceptor.Connect(_elementId, new KeyInterceptorOptions()
+                {
+                    //EnableLogging = true,
+                    TargetClass = "mud-input-slot",
+                    Keys = {
+                        new KeyOptions { Key=" ", PreventDown = "key+none" },
+                        new KeyOptions { Key="Enter", PreventDown = "key+none" },
+                        new KeyOptions { Key="NumpadEnter", PreventDown = "key+none" },
+                    },
+                });
+            }
+            await base.OnAfterRenderAsync(firstRender);
+        }
+
+        protected internal void ToggleState()
         {
             if (Disabled)
                 return;
@@ -315,7 +366,6 @@ namespace MudBlazor
 
             if (PickerVariant == PickerVariant.Inline)
             {
-                await DeterminePosition();
                 await _pickerInlineRef.MudChangeCssAsync(PickerInlineClass);
             }
         }
@@ -323,7 +373,6 @@ namespace MudBlazor
         protected virtual void OnClosed()
         {
             OnPickerClosed();
-            _pickerVerticalPosition = PickerVerticalPosition.Unknown;
         }
 
         protected virtual void OnPickerOpened()
@@ -335,65 +384,46 @@ namespace MudBlazor
         {
             PickerClosed.InvokeAsync(this);
         }
-
-        private async Task DeterminePosition()
+        protected internal void HandleKeyDown(KeyboardEventArgs obj)
         {
-            if (WindowSizeListener == null)
-            {
-                _pickerVerticalPosition = PickerVerticalPosition.Below;
+            if (Disabled || ReadOnly)
                 return;
-            }
-            var size = await WindowSizeListener.GetBrowserWindowSize();
-            var clientRect = await _pickerInlineRef.MudGetBoundingClientRectAsync();
-            if (size == null || clientRect == null)
+            switch (obj.Key)
             {
-                _pickerVerticalPosition = PickerVerticalPosition.Below;
-                return;
-            }
-            if (size.Height < clientRect.Height)
-            {
-                _pickerVerticalPosition = PickerVerticalPosition.Top;
-            }
-            else if (size.Height < clientRect.Bottom)
-            {
-                if (clientRect.Top > clientRect.Height)
-                {
-                    _pickerVerticalPosition = PickerVerticalPosition.Above;
-                }
-                else if (clientRect.Top > size.Height / 2)
-                {
-                    _pickerVerticalPosition = PickerVerticalPosition.Bottom;
-                }
-                else
-                {
-                    _pickerVerticalPosition = PickerVerticalPosition.Top;
-                }
-            }
-            else if (clientRect.Top < 0)
-            {
-                _pickerVerticalPosition = PickerVerticalPosition.Top;
-            }
-            else
-            {
-                _pickerVerticalPosition = PickerVerticalPosition.Below;
-            }
-            if (size.Width < clientRect.Right &&
-                (_pickerVerticalPosition == PickerVerticalPosition.Above ||
-                _pickerVerticalPosition == PickerVerticalPosition.Below))
-            {
-                if (clientRect.Left - clientRect.Width + 226 /*width of the input*/ > 0)
-                {
-                    _pickerHorizontalPosition = PickerHorizontalPosition.Right;
-                }
-                else if (clientRect.Left + clientRect.Width / 2 < size.Width)
-                {
-                    _pickerHorizontalPosition = PickerHorizontalPosition.Left;
-                }
-            }
-            else if (size.Width < clientRect.Right)
-            {
-                _pickerHorizontalPosition = size.Width > clientRect.Width ?
-                    PickerHorizontalPosition.Right : PickerHorizontalPosition.Left;
+                case "Enter":
+                case "NumpadEnter":
+                    Open();
+                    break;
+                case "Escape":
+                case "Tab":
+                    Close(false);
+                    break;
+                case "ArrowDown":
+                    if (obj.AltKey == true)
+                    {
+                        Open();
+                    }
+                    break;
+                case "ArrowUp":
+                    if (obj.AltKey == true)
+                    {
+                        Close(false);
+                    }
+                    break;
+                case " ":
+                    if (!Editable)
+                    {
+                        if (IsOpen)
+                        {
+                            Close(false);
+                        }
+                        else
+                        {
+                            Open();
+                        }
+
+                    }
+                    break;
             }
         }
     }

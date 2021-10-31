@@ -47,6 +47,11 @@ namespace MudBlazor
         [Parameter] public bool HideIcon { get; set; }
 
         /// <summary>
+        /// Custom hide icon.
+        /// </summary>
+        [Parameter] public string Icon { get; set; } = Icons.Material.Filled.ExpandMore;
+
+        /// <summary>
         /// If true, removes vertical padding from childcontent.
         /// </summary>
         [Parameter] public bool Dense { get; set; }
@@ -61,6 +66,7 @@ namespace MudBlazor
         /// </summary>
         [Parameter] public EventCallback<bool> IsExpandedChanged { get; set; }
 
+        internal event Action<MudExpansionPanel> NotifyIsExpandedChanged;
         /// <summary>
         /// Expansion state of the panel (two-way bindable)
         /// </summary>
@@ -73,14 +79,17 @@ namespace MudBlazor
                 if (_isExpanded == value)
                     return;
                 _isExpanded = value;
-                if (Parent?.MultiExpansion == true)
-                    Parent?.UpdateAll();
-                else
-                    Parent?.CloseAllExcept(this);
-                //InvokeAsync(StateHasChanged);
+
+                NotifyIsExpandedChanged?.Invoke(this);
                 IsExpandedChanged.InvokeAsync(_isExpanded);
             }
         }
+
+        /// <summary>
+        /// Sets the initial expansion state. Do not use in combination with IsExpanded.
+        /// Combine with MultiExpansion to have more than one panel start open.
+        /// </summary>
+        [Parameter] public bool IsInitiallyExpanded { get; set; }
 
         /// <summary>
         /// If true, the component will be disabled.
@@ -100,7 +109,7 @@ namespace MudBlazor
                 if (_nextPanelExpanded == value)
                     return;
                 _nextPanelExpanded = value;
-                InvokeAsync(StateHasChanged);
+                //InvokeAsync(StateHasChanged);
             }
         }
 
@@ -108,14 +117,8 @@ namespace MudBlazor
         {
             if (Disabled)
                 return;
-            if (Parent?.MultiExpansion == true)
-            {
-                IsExpanded = !IsExpanded;
-            }
-            else
-            {
-                IsExpanded = !IsExpanded;
-            }
+
+            IsExpanded = !IsExpanded;
         }
 
         public void Expand(bool update_parent = true)
@@ -146,6 +149,8 @@ namespace MudBlazor
             //if (Parent == null)
             //    throw new ArgumentNullException(nameof(Parent), "ExpansionPanel must exist within a ExpansionPanels component");
             base.OnInitialized();
+            if (!IsExpanded && IsInitiallyExpanded)
+                _isExpanded = IsInitiallyExpanded;
             Parent?.AddPanel(this);
         }
 
@@ -153,6 +158,5 @@ namespace MudBlazor
         {
             Parent?.RemovePanel(this);
         }
-
     }
 }

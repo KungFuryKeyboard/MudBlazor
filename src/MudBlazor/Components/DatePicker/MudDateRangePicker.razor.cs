@@ -1,9 +1,9 @@
 ﻿using System;
+using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Components;
 using MudBlazor.Extensions;
 using MudBlazor.Utilities;
-using static System.String;
 
 namespace MudBlazor
 {
@@ -39,7 +39,21 @@ namespace MudBlazor
         {
             if (_dateRange != range)
             {
+                var doesRangeContainDisabledDates = range?.Start != null && range?.End != null && Enumerable
+                    .Range(0, int.MaxValue)
+                    .Select(index => range.Start.Value.AddDays(index))
+                    .TakeWhile(date => date <= range.End.Value)
+                    .Any(date => IsDateDisabledFunc(date.Date));
+
+                if (doesRangeContainDisabledDates)
+                {
+                    _rangeText = null;
+                    await SetTextAsync(null, false);
+                    return;
+                }
+
                 _dateRange = range;
+                _value = range?.End;
 
                 if (updateValue)
                 {
@@ -68,14 +82,56 @@ namespace MudBlazor
             get => _rangeText;
             set
             {
-                if (_rangeText.Equals(value))
+                if (_rangeText?.Equals(value) ?? value == null)
                     return;
 
                 Touched = true;
                 _rangeText = value;
-                SetDateRangeAsync(ParseDateRangeValue(value.Start, value.End), false).AndForget();
+                SetDateRangeAsync(ParseDateRangeValue(value?.Start, value?.End), false).AndForget();
             }
         }
+
+        private MudRangeInput<string> _rangeInput;
+
+        /// <summary>
+        /// Focuses the start date of MudDateRangePicker
+        /// </summary>
+        /// <returns></returns>
+        public ValueTask FocusStartAsync() => _rangeInput.FocusStartAsync();
+
+        /// <summary>
+        /// Selects the start date of MudDateRangePicker
+        /// </summary>
+        /// <returns></returns>
+        public ValueTask SelectStartAsync() => _rangeInput.SelectStartAsync();
+
+        /// <summary>
+        /// Selects the specified range of the start date text
+        /// </summary>
+        /// <param name="pos1">Start position of the selection</param>
+        /// <param name="pos2">End position of the selection</param>
+        /// <returns></returns>
+        public ValueTask SelectRangeStartAsync(int pos1, int pos2) => _rangeInput.SelectRangeStartAsync(pos1, pos2);
+
+        /// <summary>
+        /// Focuses the end date of MudDateRangePicker
+        /// </summary>
+        /// <returns></returns>
+        public ValueTask FocusEndAsync() => _rangeInput.FocusEndAsync();
+
+        /// <summary>
+        /// Selects the end date of MudDateRangePicker
+        /// </summary>
+        /// <returns></returns>
+        public ValueTask SelectEndAsync() => _rangeInput.SelectEndAsync();
+
+        /// <summary>
+        /// Selects the specified range of the end date text
+        /// </summary>
+        /// <param name="pos1">Start position of the selection</param>
+        /// <param name="pos2">End position of the selection</param>
+        /// <returns></returns>
+        public ValueTask SelectRangeEndAsync(int pos1, int pos2) => _rangeInput.SelectRangeEndAsync(pos1, pos2);
 
         protected override Task DateFormatChanged(string newFormat)
         {
@@ -92,7 +148,7 @@ namespace MudBlazor
 
         protected override bool HasValue(DateTime? value)
         {
-            return _dateRange != null;
+            return null != value && value.HasValue;
         }
 
         private DateRange ParseDateRangeValue(string value)
@@ -204,6 +260,8 @@ namespace MudBlazor
 
         protected override async void Submit()
         {
+            if (ReadOnly)
+                return;
             if (_firstDate == null || _secondDate == null)
                 return;
 
@@ -224,12 +282,12 @@ namespace MudBlazor
         {
             if (_firstDate != null)
                 return $"{FormatTitleDate(_firstDate)} - {FormatTitleDate(_secondDate)}";
-            
+
             return DateRange?.Start != null
                 ? $"{FormatTitleDate(DateRange.Start)} - {FormatTitleDate(DateRange.End)}"
                 : "";
         }
-        
+
         protected override DateTime GetCalendarStartOfMonth()
         {
             var date = StartMonth ?? DateRange?.Start ?? DateTime.Today;

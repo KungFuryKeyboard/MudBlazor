@@ -39,6 +39,12 @@ namespace MudBlazor
         [Parameter] public RenderFragment DialogActions { get; set; }
 
         /// <summary>
+        /// Default options to pass to Show(), if none are explicitly provided.
+        /// Typically useful on inline dialogs.
+        /// </summary>
+        [Parameter] public DialogOptions Options { get; set; }
+
+        /// <summary>
         /// No padding at the sides
         /// </summary>
         [Parameter] public bool DisableSidePadding { get; set; }
@@ -112,7 +118,7 @@ namespace MudBlazor
                 [nameof(ClassContent)] = ClassContent,
                 [nameof(ClassActions)] = ClassActions,
             };
-            _reference = DialogService.Show<MudDialog>(title, parameters, options);
+            _reference = DialogService.Show<MudDialog>(title, parameters, options ?? Options);
             _reference.Result.ContinueWith(t =>
             {
                 _isVisible = false;
@@ -124,7 +130,7 @@ namespace MudBlazor
         protected override void OnAfterRender(bool firstRender)
         {
             if (IsInline && _reference != null)
-                _reference.Dialog?.ForceUpdate(); // forward render update to instance
+                (_reference.Dialog as MudDialog)?.ForceUpdate(); // forward render update to instance
             base.OnAfterRender(firstRender);
         }
 
